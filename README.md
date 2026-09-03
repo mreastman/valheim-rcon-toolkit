@@ -13,6 +13,30 @@ Two pieces:
 - **rcon_dashboard.py** / **rcon_terminal.py** — Python clients that poll
   that command over RCON and render it live.
 
+## Just connecting to an existing server?
+
+If someone else already installed and configured this (the sections below
+are for them), you don't need to touch any of that. You need:
+
+- Python 3 (already on macOS/Linux; on Windows, install from
+  [python.org](https://www.python.org/downloads/))
+- For the dashboard specifically: `pip install textual`
+- Just the two script files — `rcon_terminal.py` and `rcon_dashboard.py`.
+  Either download those two directly from this repo, or clone the whole
+  thing; nothing else here (EventFeed, `Environment.props`, a C# toolchain)
+  is needed on your machine.
+- From whoever runs the server: its IP address, the RCON port, and the
+  password
+
+Then just run it:
+
+```sh
+python3 rcon_dashboard.py
+```
+
+It'll prompt for the IP, port, and password. That's the entire setup —
+no server access, no build tools, no account on the server machine.
+
 ## Why polling, not push
 
 Valheim's dedicated server has no remote console of its own, and the RCON
@@ -21,7 +45,16 @@ is strictly request/response — there's no mechanism for the server to push
 anything to a connected client unprompted. So "live" here means the
 dashboard polls `events_since` once a second. In practice it reads as live.
 
-## Prerequisites
+## Setting up the server (admin)
+
+Everything below is for whoever runs the server. This works on **any
+platform** BepInEx supports — Windows, Linux, or macOS with a normal,
+unpatched BepInEx install. (If this repo sits next to a bunch of Apple
+Silicon-specific BepInEx/MonoMod fixes, those are a separate, unrelated
+problem — only relevant if you're in that exact situation. EventFeed itself
+has no platform-specific code.)
+
+### Prerequisites
 
 On the **server**, install these BepInEx plugins (all server-side only, no
 client-side install needed for any of them):
@@ -37,12 +70,16 @@ client-side install needed for any of them):
 5. **EventFeed** (this repo) — only needed for the live event feed; the
    dashboard's command input still works without it
 
-On the machine **running the dashboard**: Python 3, and for
-`rcon_dashboard.py` specifically, [Textual](https://github.com/Textualize/textual)
-(`pip install textual`). `rcon_terminal.py` needs nothing beyond the
-standard library.
+To **build** EventFeed, you'll also need the [.NET SDK](https://dotnet.microsoft.com/download)
+(any recent version — it targets .NET Framework 4.7.2, which the SDK can
+cross-compile for on any OS).
 
-## Installing EventFeed
+There's deliberately no prebuilt DLL to just download: EventFeed has to be
+built against *your* server's exact game assemblies to avoid the kind of
+version-mismatch breakage that a one-size-fits-all binary risks. Building
+locally is the safer default, even though it raises the bar to entry.
+
+### Installing EventFeed
 
 ```sh
 cd EventFeed
@@ -65,7 +102,7 @@ Restart the server. `BepInEx/LogOutput.log` should show:
 If it says `Patched 0 methods`, something's wrong with the build against
 your server's exact game version — open an issue with your BepInEx log.
 
-## Configuring RCON
+### Configuring RCON
 
 After `rcon`'s first run, edit `BepInEx/config/nl.avii.plugins.rcon.cfg`:
 
