@@ -48,6 +48,33 @@ def build_packet(request_id: int, packet_type: int, payload: str) -> bytes:
     )
 
 
+_LINE_RE = re.compile(r"^\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}: (?:Console: )?(.*)$")
+
+
+def dedupe_console_output(raw: str) -> str:
+    """RconCommands' unknown-command bridge Harmony-patches both
+    Terminal.AddString and ZLog.Log to capture a command's output -- but
+    Terminal.AddString logs through ZLog.Log internally, so every line comes
+    back twice: once bare, once prefixed "Console: ". Collapse consecutive
+    lines that are the same text once that prefix is stripped."""
+    lines = raw.splitlines()
+    out = []
+    i = 0
+    while i < len(lines):
+        if i + 1 < len(lines):
+            a = _LINE_RE.match(lines[i])
+            b = _LINE_RE.match(lines[i + 1])
+            a_text = a.group(1) if a else lines[i]
+            b_text = b.group(1) if b else lines[i + 1]
+            if a_text == b_text:
+                out.append(lines[i + 1])  # keep the copy without "Console: "
+                i += 2
+                continue
+        out.append(lines[i])
+        i += 1
+    return "\n".join(out)
+
+
 class RconConnection:
     def __init__(self, host: str, port: int, password: str):
         self.sock = socket.create_connection((host, port), timeout=10)
@@ -65,7 +92,7 @@ class RconConnection:
         return data[12:].rstrip(b"\x00").decode("ascii", errors="replace")
 
     def command(self, text: str) -> str:
-        return self._send(2, text)  # type 2 = Command
+        return dedupe_console_output(self._send(2, text))  # type 2 = Command
 
     def fetch_known_commands(self) -> set:
         """Console command names, scraped from `help`'s own output rather than

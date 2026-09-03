@@ -13,12 +13,15 @@ own *response* packets have a byte-truncation bug (only byte 0 of each
 4-byte field gets written), so responses are read leniently -- we just
 strip the 12-byte header and decode the rest as text.
 """
+import re
 import socket
 import struct
 import sys
 
 HOST = "127.0.0.1"
 PORT = 2458
+
+_LINE_RE = re.compile(r"^\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}: (?:Console: )?(.*)$")
 
 
 def build_packet(request_id: int, packet_type: int, payload: str) -> bytes:
@@ -32,10 +35,35 @@ def build_packet(request_id: int, packet_type: int, payload: str) -> bytes:
     )
 
 
+def dedupe_console_output(raw: str) -> str:
+    """RconCommands' unknown-command bridge Harmony-patches both
+    Terminal.AddString and ZLog.Log to capture a command's output -- but
+    Terminal.AddString logs through ZLog.Log internally, so every line comes
+    back twice: once bare, once prefixed "Console: ". Collapse consecutive
+    lines that are the same text once that prefix is stripped."""
+    lines = raw.splitlines()
+    out = []
+    i = 0
+    while i < len(lines):
+        if i + 1 < len(lines):
+            a = _LINE_RE.match(lines[i])
+            b = _LINE_RE.match(lines[i + 1])
+            a_text = a.group(1) if a else lines[i]
+            b_text = b.group(1) if b else lines[i + 1]
+            if a_text == b_text:
+                out.append(lines[i + 1])  # keep the copy without "Console: "
+                i += 2
+                continue
+        out.append(lines[i])
+        i += 1
+    return "\n".join(out)
+
+
 def send_and_read(sock: socket.socket, request_id: int, packet_type: int, payload: str) -> str:
     sock.sendall(build_packet(request_id, packet_type, payload))
     data = sock.recv(65536)
-    return data[12:].rstrip(b"\x00").decode("ascii", errors="replace")
+    text = data[12:].rstrip(b"\x00").decode("ascii", errors="replace")
+    return dedupe_console_output(text)
 
 
 def main():

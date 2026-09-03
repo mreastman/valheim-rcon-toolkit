@@ -24,6 +24,33 @@ namespace EventFeed
         public const string Name = "Event Feed";
         public const string Version = "1.0.0";
 
+        // Hand-picked from the ~160 vanilla console commands -- the rest are
+        // emotes, client-only settings, or dev/world-editing commands that
+        // don't matter for remote RCON admin use. Text copied verbatim from
+        // `help` so it matches the real command syntax.
+        private static readonly string[] AdminCheatSheet =
+        {
+            "-- messaging --",
+            "broadcast [center/side] [message] - Broadcasts a message.",
+            "message [player] [center/side] [message] - Sends a message to a player.",
+            "-- moderation --",
+            "kick [name/ip/userID] - kick user",
+            "ban [name/ip/userID] - ban user",
+            "unban [ip/userID] - unban user",
+            "banned - list banned users",
+            "permissions [operation] - Manage player permission overrides.",
+            "-- players --",
+            "playerlist - Prints online players.",
+            "pos [name/precision] [precision] - Prints the position of a player. If name is not given, prints the current position.",
+            "tp [player1,player2,...] [x,z,y,rot/player] [fast=false] - Teleports the player to coordinates or another player.",
+            "recall [*name] - Recalls players to you, optionally matching given name.",
+            "-- server --",
+            "save - Force saves the world and resets the world save interval.",
+            "shutdown - Closes the game.",
+            "events_since [id] - Prints buffered chat/join/leave/death events with id > [id] (default 0).",
+            "-- full list: help --",
+        };
+
         private void Awake()
         {
             var harmony = new Harmony(Guid);
@@ -53,6 +80,23 @@ namespace EventFeed
                         args.Context.AddString(line);
                     }
                 });
+
+            // Vanilla `help` dumps all 160+ registered commands, ~24 of them
+            // emotes and most of the rest client-only/dev commands with no
+            // use for a remote admin. This is a hand-picked subset instead.
+            // (RconCommands' bridge doubles every line of console output --
+            // that's a client-side display issue, deduped in
+            // rcon_dashboard.py/rcon_terminal.py, not something this command
+            // needs to work around.)
+            new Terminal.ConsoleCommand("cmds", "Admin command cheat-sheet (short list; use 'help' for the full vanilla command list).",
+                args =>
+                {
+                    foreach (var line in AdminCheatSheet)
+                    {
+                        args.Context.AddString(line);
+                    }
+                });
+
             Logger.LogInfo("Event Feed loaded.");
         }
     }
