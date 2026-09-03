@@ -42,6 +42,14 @@ dependency at all.
 Either way, it'll prompt for the IP, port, and password. That's the entire
 setup — no server access, no build tools, no account on the server machine.
 
+If you downloaded `launch_dashboard.command` individually through a browser
+rather than cloning the repo, macOS may not preserve its executable bit and
+Gatekeeper may block it as from an "unidentified developer" on first run.
+If double-clicking does nothing or shows that warning: right-click it →
+Open (bypasses Gatekeeper once), and if it still won't run, open Terminal
+and run `chmod +x launch_dashboard.command` in the folder you downloaded it
+to, then try again.
+
 ## Why polling, not push
 
 Valheim's dedicated server has no remote console of its own, and the RCON
