@@ -28,8 +28,17 @@ namespace EventFeed
         // emotes, client-only settings, or dev/world-editing commands that
         // don't matter for remote RCON admin use. Text copied verbatim from
         // `help` so it matches the real command syntax.
+        //
+        // Confirmed the console's tokenizer does a plain whitespace split
+        // with zero support for quotes or brackets -- kick/message/etc all
+        // truncate a multi-word name at the first space no matter how it's
+        // quoted. There's no fixing that from a mod (these are vanilla
+        // commands), so the tip below points at the one thing that actually
+        // works instead: SteamID, which playerlist prints right next to the
+        // name and which every [name/ip/userID] command accepts.
         private static readonly string[] AdminCheatSheet =
         {
+            "Tip: names with spaces won't parse -- use the SteamID from playerlist instead.",
             "-- messaging --",
             "broadcast [center/side] [message] - Broadcasts a message.",
             "message [player] [center/side] [message] - Sends a message to a player.",

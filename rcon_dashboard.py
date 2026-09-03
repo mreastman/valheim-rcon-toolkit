@@ -268,7 +268,11 @@ def main():
         print(f"Could not connect: {e}")
         sys.exit(1)
 
-    RconDashboard(conn, known_commands).run()
+    # mouse=False disables Textual's mouse capture so the terminal's native
+    # text selection works (e.g. to copy a SteamID out of the feed) --
+    # trades away mouse-wheel scrolling, but arrow keys/Page Up/Down still
+    # scroll the feed via keyboard.
+    RconDashboard(conn, known_commands).run(mouse=False)
 
 
 if __name__ == "__main__":
