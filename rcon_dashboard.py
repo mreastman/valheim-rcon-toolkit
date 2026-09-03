@@ -23,6 +23,7 @@ import sys
 import threading
 import time
 
+from rich.markup import escape
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual.widgets import RichLog, Input, Header, Footer
@@ -169,12 +170,16 @@ class RconDashboard(App):
 
     def _render_event(self, event: dict) -> None:
         etype = event.get("type", "?")
-        player = event.get("player", "?")
-        text = event.get("text", "")
+        # player/text come from chat messages and player names -- untrusted,
+        # arbitrary players could type "[bold red]" etc, so escape before
+        # interpolating into a markup=True string (see _run_command for the
+        # same issue with raw command output).
+        player = escape(event.get("player", "?"))
+        text = escape(event.get("text", ""))
         ts = time.strftime("%H:%M:%S", time.localtime(event.get("time", time.time())))
         style = TYPE_STYLES.get(etype.split(":")[0], "white")
         if etype.startswith("chat:"):
-            self._log(f"[dim]{ts}[/dim] [{style}]{etype.split(':', 1)[1]}[/{style}] [bold]{player}[/bold]: {text}")
+            self._log(f"[dim]{ts}[/dim] [{style}]{escape(etype.split(':', 1)[1])}[/{style}] [bold]{player}[/bold]: {text}")
         elif etype == "join":
             self._log(f"[dim]{ts}[/dim] [{style}]>> {player} joined[/{style}]")
         elif etype == "leave":
@@ -182,7 +187,7 @@ class RconDashboard(App):
         elif etype == "death":
             self._log(f"[dim]{ts}[/dim] [{style}]{player} died[/{style}]")
         else:
-            self._log(f"[dim]{ts}[/dim] {etype} {player} {text}")
+            self._log(f"[dim]{ts}[/dim] {escape(etype)} {player} {text}")
 
     def _log(self, text: str) -> None:
         self.query_one("#feed", RichLog).write(text)
@@ -196,10 +201,10 @@ class RconDashboard(App):
         first_word = text.split(" ", 1)[0].lower()
         if first_word in self.known_commands:
             command = text
-            self._log(f"[bold blue]> {command}[/bold blue]")
+            self._log(f"[bold blue]> {escape(command)}[/bold blue]")
         else:
             command = f"broadcast center {text}"
-            self._log(f"[bold blue]> (broadcast) {text}[/bold blue]")
+            self._log(f"[bold blue]> (broadcast) {escape(text)}[/bold blue]")
 
         threading.Thread(target=self._run_command, args=(command,), daemon=True).start()
 
@@ -210,7 +215,10 @@ class RconDashboard(App):
             self.call_from_thread(self._log, f"[bold red]Error: {e}[/bold red]")
             return
         if response:
-            self.call_from_thread(self._log, response)
+            # Raw server output (e.g. "[name/ip/userID]" in help/cmds text)
+            # -- escape it before it hits the markup=True RichLog, or Rich
+            # silently treats every [...] as a style tag and eats it.
+            self.call_from_thread(self._log, escape(response))
 
     def on_unmount(self) -> None:
         self._stop.set()
