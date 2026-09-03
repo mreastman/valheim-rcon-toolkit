@@ -19,23 +19,28 @@ If someone else already installed and configured this (the sections below
 are for them), you don't need to touch any of that. You need:
 
 - Python 3 (already on macOS/Linux; on Windows, install from
-  [python.org](https://www.python.org/downloads/))
-- For the dashboard specifically: `pip install textual`
-- Just the two script files — `rcon_terminal.py` and `rcon_dashboard.py`.
-  Either download those two directly from this repo, or clone the whole
-  thing; nothing else here (EventFeed, `Environment.props`, a C# toolchain)
-  is needed on your machine.
+  [python.org](https://www.python.org/downloads/) — check "Add python.exe
+  to PATH" during install)
+- Just three files — `rcon_dashboard.py`, plus a launcher for your OS:
+  `launch_dashboard.command` (macOS) or `launch_dashboard.bat` (Windows).
+  Either download those directly from this repo, or clone the whole thing;
+  nothing else here (EventFeed, `Environment.props`, a C# toolchain) is
+  needed on your machine.
 - From whoever runs the server: its IP address, the RCON port, and the
   password
 
-Then just run it:
+**Easiest way in:** double-click `launch_dashboard.command` (macOS) or
+`launch_dashboard.bat` (Windows). It checks for the `textual` package,
+installs it automatically if missing, and launches the dashboard — no
+terminal typing required beyond that.
 
-```sh
-python3 rcon_dashboard.py
-```
+Prefer the terminal yourself? `python3 rcon_dashboard.py` does the same
+thing (you'll need `pip install textual` first), or use
+`rcon_terminal.py` for a plain command-response session with no extra
+dependency at all.
 
-It'll prompt for the IP, port, and password. That's the entire setup —
-no server access, no build tools, no account on the server machine.
+Either way, it'll prompt for the IP, port, and password. That's the entire
+setup — no server access, no build tools, no account on the server machine.
 
 ## Why polling, not push
 
