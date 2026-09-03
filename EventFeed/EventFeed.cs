@@ -49,7 +49,7 @@ namespace EventFeed
             "banned - list banned users",
             "permissions [operation] - Manage player permission overrides.",
             "-- players --",
-            "playerlist - Prints online players.",
+            "who - Lists online players as 'Name - SteamID' (paste the SteamID into kick/ban/message).",
             "pos [name/precision] [precision] - Prints the position of a player. If name is not given, prints the current position.",
             "tp [player1,player2,...] [x,z,y,rot/player] [fast=false] - Teleports the player to coordinates or another player.",
             "recall [*name] - Recalls players to you, optionally matching given name.",
@@ -103,6 +103,28 @@ namespace EventFeed
                     foreach (var line in AdminCheatSheet)
                     {
                         args.Context.AddString(line);
+                    }
+                });
+
+            // Vanilla `playerlist` prints "Name/SteamID/CharacterID (x, y, z)"
+            // -- easy to accidentally copy SteamID+CharacterID together as one
+            // token when grabbing an ID for kick/ban/message, which then
+            // silently fails to match anyone (confirmed live: kick's error
+            // handling is silent, not an exception, for a non-matching id).
+            // This prints just "Name - SteamID", nothing else to mis-copy.
+            // Named "who", not "players" -- vanilla already has a "players"
+            // command (a difficulty-scale debug command), and registering a
+            // second one under that name silently lost to the vanilla one
+            // instead of erroring, which cost real time to notice.
+            new Terminal.ConsoleCommand("who", "Lists online players as 'Name - SteamID' (paste the SteamID into kick/ban/message).",
+                args =>
+                {
+                    if (ZNet.instance == null) return;
+                    foreach (var peer in ZNet.instance.GetPeers())
+                    {
+                        var name = string.IsNullOrEmpty(peer.m_playerName) ? "?" : peer.m_playerName;
+                        var steamId = peer.m_socket == null ? peer.m_uid.ToString() : peer.m_socket.GetHostName();
+                        args.Context.AddString($"{name} - {steamId}");
                     }
                 });
 
