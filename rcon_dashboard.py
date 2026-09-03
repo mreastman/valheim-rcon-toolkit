@@ -89,8 +89,31 @@ class RconConnection:
         with self._lock:
             self.req_id += 1
             self.sock.sendall(build_packet(self.req_id, packet_type, payload))
-            data = self.sock.recv(262144)
+            data = self._recv_response()
         return data[12:].rstrip(b"\x00").decode("ascii", errors="replace")
+
+    def _recv_response(self) -> bytes:
+        """A single recv() only ever grabs whatever's arrived so far -- fine
+        over loopback where a full response lands in one read, but a large
+        response (e.g. "help") reliably arrives in multiple TCP chunks over
+        a real network connection, silently truncating it. The plugin's own
+        length header can't be trusted to know when to stop (see module
+        docstring), so instead keep reading until a short gap with no more
+        data suggests the server's done sending."""
+        self.sock.settimeout(10)
+        chunks = [self.sock.recv(262144)]
+        self.sock.settimeout(0.2)
+        try:
+            while True:
+                chunk = self.sock.recv(262144)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+        except socket.timeout:
+            pass
+        finally:
+            self.sock.settimeout(10)
+        return b"".join(chunks)
 
     def command(self, text: str) -> str:
         return dedupe_console_output(self._send(2, text))  # type 2 = Command

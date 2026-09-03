@@ -59,9 +59,33 @@ def dedupe_console_output(raw: str) -> str:
     return "\n".join(out)
 
 
+def recv_response(sock: socket.socket) -> bytes:
+    """A single recv() only grabs whatever's arrived so far -- fine over
+    loopback where a full response lands in one read, but a large response
+    (e.g. "help") reliably arrives in multiple TCP chunks over a real
+    network connection, silently truncating it. The plugin's own length
+    header can't be trusted to know when to stop (see module docstring), so
+    instead keep reading until a short gap with no more data suggests the
+    server's done sending."""
+    sock.settimeout(10)
+    chunks = [sock.recv(262144)]
+    sock.settimeout(0.2)
+    try:
+        while True:
+            chunk = sock.recv(262144)
+            if not chunk:
+                break
+            chunks.append(chunk)
+    except socket.timeout:
+        pass
+    finally:
+        sock.settimeout(10)
+    return b"".join(chunks)
+
+
 def send_and_read(sock: socket.socket, request_id: int, packet_type: int, payload: str) -> str:
     sock.sendall(build_packet(request_id, packet_type, payload))
-    data = sock.recv(65536)
+    data = recv_response(sock)
     text = data[12:].rstrip(b"\x00").decode("ascii", errors="replace")
     return dedupe_console_output(text)
 
