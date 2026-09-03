@@ -1,0 +1,122 @@
+# Valheim RCON Toolkit
+
+Remote admin tooling for a Valheim dedicated server: a live terminal
+dashboard showing chat/join/leave/death events as they happen, with a
+command input for `broadcast`/`kick`/`ban`/anything else your server
+supports — connectable from any machine, not just the server box.
+
+Two pieces:
+
+- **EventFeed** — a small BepInEx server-side mod that watches chat
+  (shouts/pings), joins, leaves, and deaths, and exposes them through a new
+  `events_since <id>` console command.
+- **rcon_dashboard.py** / **rcon_terminal.py** — Python clients that poll
+  that command over RCON and render it live.
+
+## Why polling, not push
+
+Valheim's dedicated server has no remote console of its own, and the RCON
+implementation this relies on ([AviiNL/rcon](https://github.com/AviiNL/BepInEx.rcon))
+is strictly request/response — there's no mechanism for the server to push
+anything to a connected client unprompted. So "live" here means the
+dashboard polls `events_since` once a second. In practice it reads as live.
+
+## Prerequisites
+
+On the **server**, install these BepInEx plugins (all server-side only, no
+client-side install needed for any of them):
+
+1. [BepInEx 5.4.x](https://github.com/BepInEx/BepInEx) itself
+2. [rcon](https://valheim.thunderstore.io/package/AviiNL/rcon/) — the RCON
+   transport
+3. [Rcon Commands](https://valheim.thunderstore.io/package/JereKuusela/Rcon_Commands/) —
+   bridges RCON commands into the server's real console
+4. [Server devcommands](https://valheim.thunderstore.io/package/JereKuusela/Server_devcommands/) —
+   only needed if you want `broadcast`/`kick`/`ban`; `Rcon Commands` alone
+   just gives you vanilla console commands
+5. **EventFeed** (this repo) — only needed for the live event feed; the
+   dashboard's command input still works without it
+
+On the machine **running the dashboard**: Python 3, and for
+`rcon_dashboard.py` specifically, [Textual](https://github.com/Textualize/textual)
+(`pip install textual`). `rcon_terminal.py` needs nothing beyond the
+standard library.
+
+## Installing EventFeed
+
+```sh
+cd EventFeed
+cp ../Environment.props.example ../Environment.props
+# edit Environment.props: point VALHEIM_DEDI_INSTALL at your dedicated
+# server's install directory (the one containing Data/ and BepInEx/)
+dotnet build EventFeed.csproj -c Release
+cp bin/Release/net472/EventFeed.dll "<server>/BepInEx/plugins/"
+```
+
+Restart the server. `BepInEx/LogOutput.log` should show:
+
+```
+[Info   :Event Feed] Patched 3 methods.
+[Info   :Event Feed]   patched: Chat.OnNewChatMessage
+[Info   :Event Feed]   patched: ZNet.RPC_CharacterID
+[Info   :Event Feed]   patched: ZNet.RPC_Disconnect
+```
+
+If it says `Patched 0 methods`, something's wrong with the build against
+your server's exact game version — open an issue with your BepInEx log.
+
+## Configuring RCON
+
+After `rcon`'s first run, edit `BepInEx/config/nl.avii.plugins.rcon.cfg`:
+
+```ini
+[rcon]
+enabled = true
+port = 2458
+password = <pick something>
+```
+
+Restart the server again. If you want to connect from outside your local
+network, forward this port through your router/firewall same as the game
+ports — RCON traffic here is **unencrypted**, so don't reuse a real password
+and don't expose it beyond a trusted network unless you also put it behind
+something like a VPN.
+
+## Using it
+
+**One-shot terminal:**
+
+```sh
+python3 rcon_terminal.py            # prompts for IP/port
+python3 rcon_terminal.py 1.2.3.4 2458
+```
+
+Drops you into a `rcon>` prompt — type any console command, get the
+response back, `quit` to exit.
+
+**Live dashboard:**
+
+```sh
+python3 rcon_dashboard.py           # prompts for IP/port/password
+```
+
+Scrolling event feed on top, command input pinned at the bottom. Anything
+you type that matches a known console command (fetched live from the
+server's own `help` output) runs as that command; anything else is
+auto-wrapped as `broadcast center <your text>`.
+
+## Known limitations
+
+- **Only Shouts and Pings reach the server** — that's how Valheim's
+  networking model works, not something this toolkit controls. Regular
+  nearby chat and whispers never leave the sending client, so they won't
+  show up in the feed.
+- **Death detection is a heuristic, not a direct hook.** Valheim doesn't
+  expose a clean `OnDeath` event on the dedicated server; this reuses the
+  same approach as [DiscordConnector](https://github.com/nwesterhausen/valheim-discordconnector):
+  a peer re-registering a character (`ZNet.RPC_CharacterID`) while already
+  marked as joined is treated as a death/respawn rather than a new join.
+- **The RCON protocol here is not standard Source RCON**, despite being
+  modeled on it — see the docstrings in `rcon_terminal.py`/`rcon_dashboard.py`
+  for the actual (reverse-engineered) wire format. Generic RCON clients are
+  unlikely to work; use the scripts in this repo.

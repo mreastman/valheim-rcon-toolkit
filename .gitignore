@@ -1,0 +1,4 @@
+bin/
+obj/
+Environment.props
+*.user
